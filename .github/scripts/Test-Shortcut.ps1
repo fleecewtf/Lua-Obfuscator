@@ -30,8 +30,28 @@ try {
         throw 'The installed shortcut has the wrong icon.'
     }
     Write-Host "Shortcut contract passed: $shortcutPath"
+    $launched = $null
+    try {
+        # Launch the actual .lnk, then stop only the process returned by that launch.
+        $launched = Start-Process -FilePath $shortcutPath -PassThru -WindowStyle Hidden
+        if ($null -eq $launched) { throw 'The installed shortcut returned no app process.' }
+        Start-Sleep -Seconds 3
+        $launched.Refresh()
+        if ($launched.HasExited -or $launched.ProcessName -ine 'pythonw') {
+            throw 'The installed shortcut did not keep the private app running.'
+        }
+        Write-Host "Shortcut launched the private app: PID $($launched.Id)"
+    } finally {
+        if ($launched) {
+            $launched.Refresh()
+            if (-not $launched.HasExited -and $launched.ProcessName -ieq 'pythonw') {
+                $launched.Kill()
+                if (-not $launched.WaitForExit(5000)) { throw 'The launched app did not stop after shortcut verification.' }
+            }
+            $launched.Dispose()
+        }
+    }
 } finally {
     if ($link) { [Runtime.InteropServices.Marshal]::FinalReleaseComObject($link) | Out-Null }
     if ($shell) { [Runtime.InteropServices.Marshal]::FinalReleaseComObject($shell) | Out-Null }
 }
-

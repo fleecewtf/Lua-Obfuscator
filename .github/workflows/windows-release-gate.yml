@@ -65,6 +65,12 @@ jobs:
         shell: pwsh
         run: .\.github\scripts\Test-Shortcut.ps1 -ReleaseRoot $env:RELEASE_ROOT -AppName 'Lua Obfuscator'
 
+      - name: Obfuscate benign Lua and Luau fixtures through the released app
+        shell: pwsh
+        run: |
+          & (Join-Path $env:RELEASE_ROOT '.runtime\python\python.exe') -I '.github\scripts\Test-RealObfuscation.py' $env:RELEASE_ROOT
+          if ($LASTEXITCODE -ne 0) { throw 'The real Lua/Luau app workflow failed.' }
+
       - name: Upload diagnostics if a gate fails
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7

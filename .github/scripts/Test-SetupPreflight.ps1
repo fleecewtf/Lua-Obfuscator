@@ -73,3 +73,4 @@ $longPath = New-Fixture ('p' * 65)
 if ($longPath.Length -le 72) { throw 'The long-path fixture was not long enough.' }
 Assert-EarlyFailure $longPath 'The complete app folder path must be 72 characters or fewer' -NoLocalState
 Write-Host 'All early setup preflight negatives passed.'
+exit 0
