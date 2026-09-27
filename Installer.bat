@@ -10,6 +10,7 @@ set "SETUP_CHILD=0"
 set "LOG_READY="
 set "DIAGNOSTIC_LOG=nul"
 set "PATHS_VALIDATED="
+set "REPAIR_HINT="
 set "FFMPEG_DIR="
 set "DENO_DIR="
 set "HERCULES_DIR="
@@ -110,6 +111,7 @@ if defined PROCESSOR_ARCHITEW6432 set "NATIVE_ARCH=%PROCESSOR_ARCHITEW6432%"
 if /I "%NATIVE_ARCH%"=="AMD64" goto ArchitectureX64
 if /I "%NATIVE_ARCH%"=="ARM64" goto ArchitectureArm64
 set "FAIL_MESSAGE=This installer currently supports 64-bit and ARM64 Windows only."
+set "REPAIR_HINT=Use a 64-bit x64 or ARM64 Windows PC. This ZIP cannot run on 32-bit Windows."
 goto Failed
 
 :ArchitectureX64
@@ -126,19 +128,23 @@ set "PYTHON_SHA256=F6773983C8959D4281E48C4540CB0BDD23E42391E4E951CE17E7CEB52658F
 :ArchitectureReady
 if not exist "%POWERSHELL_EXE%" (
     set "FAIL_MESSAGE=Trusted Windows PowerShell is missing from the system folder."
+    set "REPAIR_HINT=Run Windows Update or Windows system-file repair, then retry. Do not install PowerShell from an unofficial site."
     goto Failed
 )
 if not exist "%ROBOCOPY_EXE%" (
     set "FAIL_MESSAGE=Trusted Windows file-copy support is missing from the system folder."
+    set "REPAIR_HINT=Run Windows Update or Windows system-file repair, then retry. Do not download Robocopy from an unofficial site."
     goto Failed
 )
 if not exist "%ROOT%LICENSE" (
     set "FAIL_MESSAGE=The bundled Tool License is missing from this folder. Extract a fresh official release and try again."
+    set "REPAIR_HINT=Extract the entire official ZIP again; keep Installer.bat and LICENSE together."
     goto Failed
 )
 "%POWERSHELL_EXE%" -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "if([IO.Path]::GetFullPath($env:ROOT).Length -gt [int]$env:MAX_ROOT_LENGTH){exit 2}" >nul 2>nul
 if errorlevel 1 (
     set "FAIL_MESSAGE=The complete app folder path must be 72 characters or fewer. Move the extracted folder closer to the drive root and try again."
+    set "REPAIR_HINT=Move the extracted folder to a shorter local path you own, then rerun Installer.bat."
     goto Failed
 )
 cls
@@ -171,17 +177,20 @@ if "%ASSUME_YES%"=="1" (
 call :ValidatePrivatePaths
 if errorlevel 1 (
     set "FAIL_MESSAGE=The app folder or one of its private setup paths is not safe to modify. Extract a fresh copy to a normal folder and try again."
+    set "REPAIR_HINT=Re-extract the whole official ZIP to a normal local folder you own, without directory links."
     goto Failed
 )
 set "PATHS_VALIDATED=1"
 call :CheckRootWritePermission
 if errorlevel 1 (
     set "FAIL_MESSAGE=Setup cannot write to this app folder. Move it to a folder owned by this Windows user and try again."
+    set "REPAIR_HINT=Move the whole extracted folder to a writable local folder you own, then retry."
     goto Failed
 )
 if not exist "%RUNTIME%" mkdir "%RUNTIME%" >nul 2>nul
 if not exist "%RUNTIME%" (
     set "FAIL_MESSAGE=Could not create the private runtime folder."
+    set "REPAIR_HINT=Check free disk space and folder write access, then retry."
     goto Failed
 )
 call :AcquireSetupLock
@@ -191,11 +200,13 @@ if errorlevel 1 goto SetupAlreadyRunning
 if exist "%LOG%" del /f /q "%LOG%" >nul 2>nul
 if exist "%LOG%" (
     set "FAIL_MESSAGE=The previous setup log could not be replaced safely."
+    set "REPAIR_HINT=Close programs using setup.log, check folder write access, then retry."
     goto Failed
 )
 "%POWERSHELL_EXE%" -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "$stream=[IO.File]::Open($env:LOG,[IO.FileMode]::CreateNew,[IO.FileAccess]::Write,[IO.FileShare]::Read);$stream.Dispose()" >nul 2>nul
 if errorlevel 1 (
     set "FAIL_MESSAGE=A fresh private setup log could not be created safely."
+    set "REPAIR_HINT=Check free disk space and folder write access, then retry."
     goto Failed
 )
 set "LOG_READY=1"
@@ -203,16 +214,19 @@ set "DIAGNOSTIC_LOG=%LOG%"
 call :EnsureAppClosed
 if errorlevel 1 (
     set "FAIL_MESSAGE=Lua Obfuscator is open. Close the app before installing or repairing its files."
+    set "REPAIR_HINT=Close Lua Obfuscator completely, then rerun Installer.bat."
     goto Failed
 )
 call :RecoverInterruptedPackageTransaction
 if errorlevel 1 (
     set "FAIL_MESSAGE=An interrupted private Python package repair could not be recovered safely."
+    set "REPAIR_HINT=Close other programs using this folder, then retry. If it repeats, use a fresh official ZIP."
     goto Failed
 )
 if not exist "%DOWNLOADS%" mkdir "%DOWNLOADS%" >>"%LOG%" 2>&1
 if not exist "%DOWNLOADS%" (
     set "FAIL_MESSAGE=Could not create the private download folder."
+    set "REPAIR_HINT=Check free disk space and folder write access, then retry."
     goto Failed
 )
 
@@ -225,8 +239,18 @@ call :LogCurrent
 set "LOG_MESSAGE=Native architecture: %NATIVE_ARCH%"
 call :LogCurrent
 
-if not exist "%APP_FILE%" (
-    set "FAIL_MESSAGE=Lua Obfuscator.pyw is missing from this folder."
+echo.
+echo   Checking bundled app and Windows shortcut support before downloads...
+call :CheckAppSource
+if errorlevel 1 (
+    set "FAIL_MESSAGE=Lua Obfuscator.pyw is missing, empty, or unsafe in this folder."
+    set "REPAIR_HINT=Re-extract the entire official ZIP, including Lua Obfuscator.pyw, then rerun setup."
+    goto Failed
+)
+call :CheckShortcutSupport
+if errorlevel 1 (
+    set "FAIL_MESSAGE=Windows shortcut support could not be verified before downloads."
+    set "REPAIR_HINT=Re-extract the ZIP to a normal folder. If this repeats, ask your Windows administrator about shortcut support."
     goto Failed
 )
 
@@ -238,6 +262,7 @@ if not errorlevel 1 (
     if exist "%VENV%" call :RemovePkgTree "%VENV%"
     if exist "%VENV%" (
         set "FAIL_MESSAGE=An old .venv folder could not be removed after private Python was verified."
+        set "REPAIR_HINT=Close programs using this folder, then retry. If it repeats, extract a fresh ZIP to a new folder."
         goto Failed
     )
     echo      Existing private Python is valid. Keeping it.
@@ -262,11 +287,13 @@ echo      Downloading and preparing private Python...
 call :InstallEmbedPy
 if errorlevel 1 (
     set "FAIL_MESSAGE=Private Python could not be installed or verified."
+    set "REPAIR_HINT=Check your connection and free disk space, then retry. See setup.log for the failed download or hash check."
     goto Failed
 )
 if exist "%VENV%" call :RemovePkgTree "%VENV%"
 if exist "%VENV%" (
     set "FAIL_MESSAGE=An invalid old .venv folder could not be removed."
+    set "REPAIR_HINT=Close programs using this folder, then retry. If it repeats, extract a fresh ZIP to a new folder."
     goto Failed
 )
 set "ENV_MODE=embedded"
@@ -277,6 +304,13 @@ set "APP_PYW=%RUNTIME_PYW%"
 call :ValidateSelectedEnvironment
 if errorlevel 1 (
     set "FAIL_MESSAGE=The private Python environment did not pass validation."
+    set "REPAIR_HINT=Check free disk space and retry. If it repeats, re-extract the official ZIP to a new folder."
+    goto Failed
+)
+call :CompileAppSource
+if errorlevel 1 (
+    set "FAIL_MESSAGE=Lua Obfuscator.pyw could not be compiled by private Python."
+    set "REPAIR_HINT=Re-extract the entire official ZIP, then rerun Installer.bat."
     goto Failed
 )
 echo      Done.
@@ -294,6 +328,7 @@ if errorlevel 1 (
 call :InstallPythonPackages
 if errorlevel 1 (
     set "FAIL_MESSAGE=PySide6 could not be installed and verified."
+    set "REPAIR_HINT=Check your connection and free disk space, then retry. See setup.log for the package error."
     goto Failed
 )
 call :TouchSetupLock
@@ -319,6 +354,7 @@ if not errorlevel 1 (
     call :InstallHercules
     if errorlevel 1 (
         set "FAIL_MESSAGE=The pinned Hercules source could not be installed and verified."
+        set "REPAIR_HINT=Check your connection and free disk space, then retry. See setup.log for the Hercules download or hash error."
         goto Failed
     )
 )
@@ -335,6 +371,7 @@ if not errorlevel 1 (
     call :InstallLua
     if errorlevel 1 (
         set "FAIL_MESSAGE=The pinned Lua runtime could not be installed and verified."
+        set "REPAIR_HINT=Check your connection and free disk space, then retry. See setup.log for the Lua download or hash error."
         goto Failed
     )
 )
@@ -352,17 +389,20 @@ if errorlevel 1 (
 call :VerifyEverything
 if errorlevel 1 (
     set "FAIL_MESSAGE=One or more final component checks failed."
+    set "REPAIR_HINT=See the last self-test error in setup.log, then rerun setup once. If it repeats, use a fresh official ZIP."
     goto Failed
 )
 echo      Creating the Lua Obfuscator start shortcut...
 call :CreateShortcut
 if errorlevel 1 (
     set "FAIL_MESSAGE=The start shortcut could not be created."
+    set "REPAIR_HINT=Close programs using the old shortcut, check folder write access, then rerun setup."
     goto Failed
 )
 call :WriteSetupMarker
 if errorlevel 1 (
     set "FAIL_MESSAGE=Setup finished its checks but could not save the completion marker."
+    set "REPAIR_HINT=Check folder write access and free disk space, then rerun setup."
     goto Failed
 )
 echo      Every check passed.
@@ -370,6 +410,7 @@ echo      Every check passed.
 if exist "%DOWNLOADS%" call :RemovePkgTree "%DOWNLOADS%"
 if exist "%DOWNLOADS%" (
     set "FAIL_MESSAGE=Setup passed its checks but could not safely remove temporary downloads."
+    set "REPAIR_HINT=Close programs scanning this folder, check write access, then rerun setup."
     goto Failed
 )
 set "LOG_MESSAGE=Setup completed successfully."
@@ -421,7 +462,11 @@ exit /b 1
 
 :Failed
 if not defined FAIL_MESSAGE set "FAIL_MESSAGE=Setup stopped because an unexpected error occurred."
+if "%FAIL_MESSAGE%"=="Setup lost ownership of its private setup lock." set "REPAIR_HINT=Close any other setup window and retry. If none is open, restart Windows first."
+if not defined REPAIR_HINT set "REPAIR_HINT=Review setup.log, then retry from a fresh official ZIP in a writable local folder."
 set "LOG_MESSAGE=ERROR: %FAIL_MESSAGE%"
+if defined LOG_READY call :LogCurrent
+set "LOG_MESSAGE=HOW_TO_FIX: %REPAIR_HINT%"
 if defined LOG_READY call :LogCurrent
 if defined PATHS_VALIDATED call :ReleaseSetupLock
 echo.
@@ -430,6 +475,9 @@ echo                     SETUP STOPPED
 echo  ==================================================
 echo.
 echo   %FAIL_MESSAGE%
+echo.
+echo   How to fix:
+echo      %REPAIR_HINT%
 echo.
 echo   No success was reported because all checks did not pass.
 if defined LOG_READY (
@@ -440,7 +488,7 @@ if defined LOG_READY (
     echo   No new log was written because setup stopped before it could safely own one.
 )
 echo.
-echo   Fix the listed problem, then run Installer.bat again.
+echo   Run Installer.bat again after fixing the problem.
 echo.
 call :PauseIfNeeded
 exit /b 1
@@ -1095,7 +1143,7 @@ if errorlevel 1 exit /b 1
 call :ValidateLua
 if errorlevel 1 exit /b 1
 
-"%APP_PY%" -I -c "import os; from pathlib import Path; app=Path(os.environ['APP_FILE']); assert app.is_file(); compile(app.read_text(encoding='utf-8'), str(app), 'exec'); print('Application source compiled successfully.')" >>"%LOG%" 2>&1
+call :CompileAppSource
 if errorlevel 1 exit /b 1
 set "CHECK_DIR=%RUNTIME%\setup-check"
 if exist "%CHECK_DIR%" call :RemovePkgTree "%CHECK_DIR%"
@@ -1136,6 +1184,20 @@ if errorlevel 1 exit /b 1
 call :RemovePkgTree "%CHECK_DIR%"
 if exist "%CHECK_DIR%" exit /b 1
 exit /b 0
+
+:CheckAppSource
+"%POWERSHELL_EXE%" -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "$ErrorActionPreference='Stop';$item=Get-Item -LiteralPath $env:APP_FILE -Force;if($item.PSIsContainer-or($item.Attributes-band[IO.FileAttributes]::ReparsePoint)-or$item.Length-lt1-or$item.Length-gt4MB){throw 'Bundled app source is missing, linked, empty, or oversized.'};$text=[Text.UTF8Encoding]::new($false,$true).GetString([IO.File]::ReadAllBytes($item.FullName));if([string]::IsNullOrWhiteSpace($text)-or$text.IndexOf([char]0)-ge0){throw 'Bundled app source is not valid nonempty UTF-8 text.'};Write-Output 'Bundled app source passed early preflight.'" >>"%LOG%" 2>&1
+exit /b %ERRORLEVEL%
+
+:CompileAppSource
+if not defined APP_PY exit /b 1
+if not exist "%APP_PY%" exit /b 1
+"%APP_PY%" -I -c "import os; from pathlib import Path; app=Path(os.environ['APP_FILE']); assert app.is_file(); compile(app.read_text(encoding='utf-8'), str(app), 'exec'); print('Application source compiled successfully.')" >>"%LOG%" 2>&1
+exit /b %ERRORLEVEL%
+
+:CheckShortcutSupport
+"%POWERSHELL_EXE%" -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "$ErrorActionPreference='Stop';$path=Join-Path $env:ROOT 'Lua Obfuscator.lnk';if(Test-Path -LiteralPath $path){$item=Get-Item -LiteralPath $path -Force;if($item.PSIsContainer-or($item.Attributes-band[IO.FileAttributes]::ReparsePoint)){throw 'The existing Lua Obfuscator shortcut is not a normal file.'}};$shell=New-Object -ComObject WScript.Shell;if(-not $shell){throw 'Windows shortcut COM support is unavailable.'};$probe=Join-Path $env:RUNTIME ('shortcut-preflight-'+[Guid]::NewGuid().ToString('N')+'.lnk');try{$link=$shell.CreateShortcut($probe);$link.TargetPath=$env:POWERSHELL_EXE;$link.WorkingDirectory=$env:RUNTIME;$link.Save();if(-not(Test-Path -LiteralPath $probe -PathType Leaf)){throw 'Windows did not save a test shortcut.'};$readback=$shell.CreateShortcut($probe);if([IO.Path]::GetFullPath($readback.TargetPath) -ine [IO.Path]::GetFullPath($env:POWERSHELL_EXE)){throw 'Windows did not preserve the test shortcut target.'}}finally{if(Test-Path -LiteralPath $probe){Remove-Item -LiteralPath $probe -Force}};Write-Output 'Windows shortcut creation and readback passed preflight.'" >>"%LOG%" 2>&1
+exit /b %ERRORLEVEL%
 
 :CreateShortcut
 set "LINK_PATH=%ROOT%Lua Obfuscator.lnk"

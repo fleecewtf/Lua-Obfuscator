@@ -35,7 +35,7 @@ To remove this tool, close it and delete the extracted folder. This removes its 
 
 TROUBLESHOOTING
 
-If setup or the shortcut fails, review setup.log and run Installer.bat again. Success is shown only after the dependencies, offline self-tests, and shortcut all pass. Keep the complete extracted folder together.
+Before downloading private components, setup checks the bundled app source and Windows shortcut support. Once private Python is ready, it checks app syntax before installing the larger packages. If setup stops, the window immediately shows the failed check and a short "How to fix" instruction; the same guidance is saved in setup.log. Correct the problem and run Installer.bat again. Success is shown only after the dependencies, offline self-tests, and shortcut all pass. Keep the complete extracted folder together. WinGet is not required.
 
 Lua and Hercules are installed privately by Installer.bat. A separate system-wide Lua installation is not required.
 

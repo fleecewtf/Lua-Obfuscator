@@ -35,13 +35,35 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Build and fresh-extract the exact release ZIP
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $zip = Join-Path $env:RUNNER_TEMP 'Lua-Obfuscator-v1.0.13.zip'
+          $releaseRoot = Join-Path $env:RUNNER_TEMP 'Fleece Lua Obfuscator release'
+          & .\scripts\Build-ReleaseZip.ps1 -OutputPath $zip
+          Expand-Archive -LiteralPath $zip -DestinationPath $releaseRoot
+          "RELEASE_ROOT=$releaseRoot" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Verify early failures and repair instructions before downloads
+        shell: pwsh
+        run: .\.github\scripts\Test-SetupPreflight.ps1 -ReleaseRoot $env:RELEASE_ROOT -AppName 'Lua Obfuscator'
+
       - name: Perform a clean private setup and app self-test through the confirmation prompt
         shell: cmd
-        run: echo Y| call Installer.bat --no-pause
+        run: |
+          cd /d "%RELEASE_ROOT%"
+          echo Y| call Installer.bat --no-pause
 
       - name: Verify the repair path against the installed runtime
         shell: cmd
-        run: Installer.bat --yes --no-pause
+        run: |
+          cd /d "%RELEASE_ROOT%"
+          Installer.bat --yes --no-pause
+
+      - name: Verify the repaired shortcut target and launch contract
+        shell: pwsh
+        run: .\.github\scripts\Test-Shortcut.ps1 -ReleaseRoot $env:RELEASE_ROOT -AppName 'Lua Obfuscator'
 
       - name: Upload diagnostics if a gate fails
         if: failure()
@@ -52,6 +74,6 @@ jobs:
           include-hidden-files: true
           retention-days: 7
           path: |
-            setup.log
-            .runtime/error.log
-            .runtime/logs/*.log
+            ${{ runner.temp }}/Fleece Lua Obfuscator release/setup.log
+            ${{ runner.temp }}/Fleece Lua Obfuscator release/.runtime/error.log
+            ${{ runner.temp }}/Fleece Lua Obfuscator release/.runtime/logs/*.log
