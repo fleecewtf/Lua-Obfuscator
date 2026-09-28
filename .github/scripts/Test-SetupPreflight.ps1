@@ -10,7 +10,7 @@ $root = [IO.Path]::GetFullPath($ReleaseRoot).TrimEnd('\')
 $scratchBase = [IO.Path]::GetFullPath($(if ($env:RUNNER_TEMP) { $env:RUNNER_TEMP } else { [IO.Path]::GetTempPath() })).TrimEnd('\')
 $scratch = Join-Path $scratchBase ('pf-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
 [IO.Directory]::CreateDirectory($scratch) | Out-Null
-$expected = @('Installer.bat', 'LICENSE', "$AppName.pyw", 'READ ME.txt')
+$expected = @('Installer.bat', 'LICENSE', "$AppName.pyw", 'READ ME.txt', 'requirements-win-arm64.txt', 'requirements-win-x64.txt')
 foreach ($name in $expected) {
     if (-not [IO.File]::Exists((Join-Path $root $name))) { throw "Release ZIP omitted $name." }
 }

@@ -10,7 +10,7 @@ $root = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..')).TrimEnd('\')
 $output = [IO.Path]::GetFullPath($OutputPath)
 $appName = 'Lua Obfuscator'
 $archiveStem = 'Lua-Obfuscator'
-$releaseFiles = @('Lua Obfuscator.pyw', 'Installer.bat', 'LICENSE', 'READ ME.txt')
+$releaseFiles = @('Lua Obfuscator.pyw', 'Installer.bat', 'LICENSE', 'READ ME.txt', 'requirements-win-arm64.txt', 'requirements-win-x64.txt')
 
 function Read-TrackedBlob([string]$RelativePath) {
     $start = [Diagnostics.ProcessStartInfo]::new('git')
@@ -56,7 +56,7 @@ try {
         throw "The archive filename must be $archiveStem-v$version.zip."
     }
     $paths = @($releaseFiles | Sort-Object -CaseSensitive)
-    if ($paths.Count -ne 4 -or (@($paths | Select-Object -Unique)).Count -ne 4) {
+    if ($paths.Count -ne 6 -or (@($paths | Select-Object -Unique)).Count -ne 6) {
         throw 'The explicit release file list is incomplete or contains duplicates.'
     }
     $committed = @{}
