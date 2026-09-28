@@ -41,6 +41,8 @@ Setup keeps the private Python runtime, dependencies, settings, and every app co
 
 Setup pins and verifies official Python 3.14.7, pip, PySide6-Essentials, Hercules, and Lua 5.4.8. Downloaded runtime archives are checked against pinned SHA-256 hashes before use.
 
+Setup and repair also require the bundled, hash-verified dependency lock file selected automatically for x64 or ARM64. Every downloaded Python wheel must match its approved SHA-256 hash, including transitive dependencies. Keep the entire extracted folder together; no account or global Python installation is needed.
+
 Before downloading private components, setup checks the bundled app source and Windows shortcut support. Once private Python is ready, it compiles the app before installing the larger packages. WinGet is not required.
 
 Run `Installer.bat` again to repair the private components or after moving the complete folder. Setup preserves your source files and recreates the shortcut for the folder's current location.

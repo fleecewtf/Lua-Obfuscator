@@ -25,6 +25,8 @@ SETUP DETAILS
 
 Setup keeps official Python 3.14.7, PySide6-Essentials, Hercules, Lua 5.4.8, settings, and app-specific files private to this folder. It does not require administrator access, change PATH, or install global Python packages. Downloaded runtime archives are verified before use.
 
+Setup and repair automatically choose the bundled x64 or ARM64 dependency lock file, verify its integrity, and require every downloaded Python wheel, including transitive dependencies, to match its approved SHA-256 hash. Keep the complete extracted folder together; no account is required.
+
 Setup creates and validates a folder-local Lua Obfuscator shortcut that starts the app directly with this folder's private runtime. Run Installer.bat again to repair setup or after moving the complete folder. Your source files are never changed by setup.
 
 PRIVACY AND REMOVAL

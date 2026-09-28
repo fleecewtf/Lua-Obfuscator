@@ -19,7 +19,7 @@ from typing import Optional
 
 
 APP_TITLE = "Lua Obfuscator"
-APP_VERSION = "1.0.13"
+APP_VERSION = "1.0.14"
 HERCULES_COMMIT = "ace084c897369faf584dfa3baeea159d7b205213"
 LUA_RUNTIME_HASHES = {
     "lua54.dll": "a842f0d33c897ce08411ea2565e8c19859b45a2374b905de2d56434c7fa4d732",
@@ -1728,7 +1728,7 @@ class LuaObfuscator(QMainWindow):
 
 
 def run_self_test(output_dir):
-    assert APP_VERSION == "1.0.13"
+    assert APP_VERSION == "1.0.14"
     output_dir = Path(output_dir).resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
     checks = []
