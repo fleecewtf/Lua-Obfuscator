@@ -2,6 +2,10 @@
 
 # lua obfuscator
 
+Current audit update: **v1.0.15**. Includes app-specific bug fixes, bounded offline regression/performance tests, and shared setup hardening.
+
+All Fleece desktop tools use the same installation workflow: download the official ZIP, extract the entire folder, run `Installer.bat`, accept the bundled Terms/Tool License, wait for final checks, then open the folder-local shortcut. Setup installs a private runtime without changing system Python or requiring administrator access. Rerun it to repair or refresh a moved shortcut. Keep the full path at most 72 characters, without percent signs. Architecture support and extra components vary by tool; File Converter remains x64-only.
+
 A little tool I made with AI to quickly obfuscate Lua 5.4 and Roblox Luau scripts and code locally on 64-bit Windows.
 
 <img src="Lua%20Obfuscator.png" alt="Lua Obfuscator app window" width="760">
@@ -77,6 +81,14 @@ If setup stops, the window immediately identifies the failed check and shows a s
 If the `Lua Obfuscator` shortcut does not open, run `Installer.bat` again and keep the complete extracted folder together. Setup recreates and validates the shortcut for the folder's current location.
 
 Lua and Hercules are installed privately by `Installer.bat`; a separate system-wide Lua installation is not required.
+
+Lua 5.4 output is syntax-checked with the private compiler before it is saved. A syntax check does not prove that obfuscated code behaves identically. Luau output is generated without a local Luau syntax or execution check. Test either output in its intended environment before replacing code in a project. High obfuscation can greatly increase output size and execution cost, even for short inputs.
+
+Click **Cancel** to stop the active engine or syntax check. Existing output is replaced only after a successful job and your replacement approval. The app does not execute the input script as part of obfuscation or syntax validation.
+
+Installed components work offline. Repairing missing or damaged components with `Installer.bat` can require an internet connection; an offline obfuscation error is not a reason to share or upload your source code.
+
+For an additional reproducible offline regression check, run `.runtime\python\python.exe -I scripts\Test-AppOffline.py` from the extracted folder. It uses only the verified private Lua runtime, the local pinned engine, and generated synthetic scripts in disposable temporary folders. It does not install or download anything. Its synthetic Lua outputs are executed for behavior checks; Luau results are explicitly reported as unexecuted.
 
 ## license
 

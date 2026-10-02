@@ -39,7 +39,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $zip = Join-Path $env:RUNNER_TEMP 'Lua-Obfuscator-v1.0.14.zip'
+          $zip = Join-Path $env:RUNNER_TEMP 'Lua-Obfuscator-v1.0.15.zip'
           $releaseRoot = Join-Path $env:RUNNER_TEMP 'Fleece Lua Obfuscator release'
           & .\scripts\Build-ReleaseZip.ps1 -OutputPath $zip
           Expand-Archive -LiteralPath $zip -DestinationPath $releaseRoot

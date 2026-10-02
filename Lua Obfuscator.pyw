@@ -19,7 +19,7 @@ from typing import Optional
 
 
 APP_TITLE = "Lua Obfuscator"
-APP_VERSION = "1.0.14"
+APP_VERSION = "1.0.15"
 HERCULES_COMMIT = "ace084c897369faf584dfa3baeea159d7b205213"
 LUA_RUNTIME_HASHES = {
     "lua54.dll": "a842f0d33c897ce08411ea2565e8c19859b45a2374b905de2d56434c7fa4d732",
@@ -285,9 +285,25 @@ def is_plain_directory(path):
     return stat.S_ISDIR(details.st_mode) and not reparse_point
 
 
+def prepare_work_root(runtime_dir):
+    runtime_dir = Path(os.path.abspath(os.fspath(runtime_dir)))
+    if not is_plain_directory(runtime_dir):
+        raise RuntimeError("The private runtime folder is unsafe or unavailable. Run Installer.bat again.")
+    root = runtime_dir / "work"
+    try:
+        root.mkdir(mode=0o700)
+    except FileExistsError:
+        pass
+    if not is_plain_directory(root) or root.resolve(strict=True).parent != runtime_dir.resolve(strict=True):
+        raise RuntimeError("The private work folder is unsafe. Run Installer.bat again.")
+    return root
+
+
 def remove_job_directory(path, work_root):
     target = Path(path)
     root = Path(work_root)
+    if not is_plain_directory(root) or not is_plain_directory(root.parent):
+        return False
     if target.parent != root or not target.name.startswith("job-"):
         return False
     if not is_plain_directory(target):
@@ -301,6 +317,8 @@ def remove_job_directory(path, work_root):
 
 def cleanup_stale_work_directories(work_root, current_time=None):
     root = Path(work_root)
+    if not is_plain_directory(root) or not is_plain_directory(root.parent):
+        return 0
     now = time.time() if current_time is None else current_time
     removed = 0
     scanned = 0
@@ -1143,6 +1161,8 @@ class LuaObfuscator(QMainWindow):
             self.set_source_file(Path(filename))
 
     def set_source_file(self, path: Path):
+        if self.running:
+            return
         try:
             path = path.expanduser().resolve(strict=True)
             path_is_file = path.is_file()
@@ -1272,6 +1292,8 @@ class LuaObfuscator(QMainWindow):
             self.start_obfuscation()
 
     def start_obfuscation(self):
+        if self.running:
+            return
         self.refresh_tool_paths()
 
         try:
@@ -1342,8 +1364,7 @@ class LuaObfuscator(QMainWindow):
         self.cleanup_work_dir()
 
         try:
-            work_root = self.app_dir / ".runtime" / "work"
-            work_root.mkdir(parents=True, exist_ok=True)
+            work_root = prepare_work_root(self.app_dir / ".runtime")
             self.work_dir = Path(
                 tempfile.mkdtemp(prefix="job-", dir=str(work_root))
             )
@@ -1356,7 +1377,7 @@ class LuaObfuscator(QMainWindow):
                 staged_source,
                 start=self.cli_path.parent,
             )
-        except (OSError, ValueError) as error:
+        except (OSError, RuntimeError, ValueError) as error:
             self.cleanup_work_dir()
             self.status_label.setText("Could not prepare")
             self.append_log(f"Could not prepare the source file: {error}")
@@ -1443,10 +1464,12 @@ class LuaObfuscator(QMainWindow):
         return True
 
     def cancel_obfuscation(self):
+        if not self.running:
+            return
+        self.cancel_requested = True
+        self.status_label.setText("Stopping...")
         process = self.validation_process or self.process
         if process and process.state() != QProcess.NotRunning:
-            self.cancel_requested = True
-            self.status_label.setText("Stopping...")
             process.kill()
 
     def staged_output_size(self):
@@ -1463,6 +1486,8 @@ class LuaObfuscator(QMainWindow):
 
     def start_output_validation(self, staged_size):
         if self.active_target != "lua" or self.lua_path is None:
+            if self.active_target == "luau":
+                self.append_log("Luau output is not syntax-checked locally. Test it in its intended Luau environment before use.")
             self.publish_validated_output()
             return
 
@@ -1481,8 +1506,10 @@ class LuaObfuscator(QMainWindow):
             return
 
         if not compiler_available:
-            self.append_log("Lua output could not be syntax checked.")
-            self.publish_validated_output()
+            self.finish_operation(
+                "Failed",
+                "Lua output could not be syntax checked because the private compiler is missing. Run Installer.bat again.",
+            )
             return
 
         process = QProcess(self)
@@ -1699,6 +1726,9 @@ class LuaObfuscator(QMainWindow):
         QDesktopServices.openUrl(QUrl.fromLocalFile(str(folder)))
 
     def dragEnterEvent(self, event: QDragEnterEvent):
+        if self.running:
+            event.ignore()
+            return
         urls = event.mimeData().urls()
         if len(urls) == 1 and urls[0].isLocalFile():
             path = Path(urls[0].toLocalFile())
@@ -1708,6 +1738,9 @@ class LuaObfuscator(QMainWindow):
         event.ignore()
 
     def dropEvent(self, event: QDropEvent):
+        if self.running:
+            event.ignore()
+            return
         urls = event.mimeData().urls()
         if urls:
             self.set_source_file(Path(urls[0].toLocalFile()))
@@ -1728,7 +1761,7 @@ class LuaObfuscator(QMainWindow):
 
 
 def run_self_test(output_dir):
-    assert APP_VERSION == "1.0.14"
+    assert APP_VERSION == "1.0.15"
     output_dir = Path(output_dir).resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
     checks = []
