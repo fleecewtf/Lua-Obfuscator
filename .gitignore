@@ -18,3 +18,9 @@ __pycache__/
 *.fleecepack
 Thumbs.db
 Desktop.ini
+
+# Developer and test tooling stays local.
+/.github/
+/scripts/
+/tests/
+/developer/
